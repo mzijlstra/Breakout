@@ -78,7 +78,7 @@ class Paddle(pygame.Rect):
 		surface.blit(Paddle.img, self)
 
 class Brick(pygame.Rect):
-	img = pygame.image.load('brick.png')
+	img = pygame.image.load('brick3.png')
 
 	def display(self, surface):
 		'Blits brick image to the given surface'
@@ -96,12 +96,18 @@ def main():
 	screen = pygame.display.set_mode(size)
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
+	back = pygame.image.load('background2.png').convert()
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
 	ball = Ball()
 	bricks = []
 	brickrect = Brick.img.get_rect()
+
+	#optimize images
+	Paddle.img = Paddle.img.convert_alpha()
+	Ball.img = Ball.img.convert_alpha()
+	Brick.img = Brick.img.convert_alpha()
 
 	# create brick positions
 	rows = 4
@@ -179,7 +185,8 @@ def main():
 			
 
 		#draw screen
-		screen.fill(black)
+		#screen.fill(black)
+		screen.blit(back, screen.get_rect())
 		ball.display(screen)
 		paddle.display(screen)
 		for b in bricks:

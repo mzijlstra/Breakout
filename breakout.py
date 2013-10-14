@@ -96,7 +96,7 @@ def main():
 	screen = pygame.display.set_mode(size)
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
-	back = pygame.image.load('background2.png').convert()
+	back = pygame.image.load('background.png').convert()
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
@@ -153,7 +153,10 @@ def main():
 			if ball.colliderect(paddle):
 				ball.goUp()
 				# random dx after paddle hit
-				ball.dx = random.uniform(-3,3)
+				#ball.dx = random.uniform(-3,3)
+				dx = (ball.x + ball.w / 2) - (paddle.x + paddle.w / 2)
+				ball.dx = dx / float(paddle.w) * 6.0;
+
 				# make sure we exit the paddle right away
 				ball.update()
 
@@ -193,7 +196,7 @@ def main():
 			b.display(screen)
 		pygame.display.flip()
 
-		#do all this at 40 fps
-		clock.tick(40)
+		#do all this at 60 fps
+		clock.tick(60)
 
 if __name__ == '__main__': main()

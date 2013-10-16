@@ -61,7 +61,7 @@ class Paddle(pygame.Rect):
 		self.py = y
 
 		# speed
-		self.speed = 2
+		self.speed = 2.5
 	
 	def moveLeft(self):
 		'Moves paddle left'
@@ -80,9 +80,21 @@ class Paddle(pygame.Rect):
 class Brick(pygame.Rect):
 	img = pygame.image.load('brick3.png')
 
+	def __init__(self, x, y, w, h, dx):
+		'constructor, rect stuff plus dx'
+		pygame.Rect.__init__(self, x, y, w, h)
+		self.dx = dx
+
 	def display(self, surface):
 		'Blits brick image to the given surface'
 		surface.blit(Brick.img, self)
+
+	def update(self):
+		self.x += self.dx
+		if self.x > 640:
+			self.x = -32;
+		if self.x < -32:
+			self.x = 640
 
 
 def main():
@@ -118,8 +130,11 @@ def main():
 	for row in range(rows):
 		for col in range(cols):
 			x = col * brickW
-			y = 64 + row * brickH
-			bricks.append(Brick(x, y, brickW, brickH))
+			y = 32 + row * brickH * 3
+			dx = 1
+			if row % 2 == 0:
+				dx = -1
+			bricks.append(Brick(x, y, brickW, brickH, dx))
 
 	# game loop
 	while True:
@@ -132,12 +147,32 @@ def main():
 				sys.exit()
 
 
-		# move paddle based on left and right arrows
 		keys = pygame.key.get_pressed()
-		if keys[pygame.K_LEFT] and paddle.left > 0:
-			paddle.moveLeft()
-		if keys[pygame.K_RIGHT] and paddle.right < width:
-			paddle.moveRight()
+		# move paddle based on left and right arrows
+		#if keys[pygame.K_LEFT] and paddle.left > 0:
+		#	paddle.moveLeft()
+		#if keys[pygame.K_RIGHT] and paddle.right < width:
+		#	paddle.moveRight()
+
+		# move paddle based on mouse
+		(mx, my) = pygame.mouse.get_pos()
+		if my > 640 - paddle.h:
+			my = 640 - paddle.h
+		elif my < 240:
+			my = 240
+
+		paddlehw = paddle.w / 2
+		if mx < paddlehw:
+			mx = paddlehw
+		elif mx > 640 - paddlehw:
+			mx = paddlehw
+
+		paddle.x = mx - paddlehw
+		paddle.y = my
+
+		# move each block
+		for brick in bricks:
+			brick.update()
 
 		if state == 'playing':
 			# move ball based on it's own dx/dy
@@ -165,10 +200,20 @@ def main():
 				state = 'new'
 
 			# check block collisions
-			bindex = ball.collidelist(bricks)
-			if bindex != -1:
-				bricks.pop(bindex)
-				ball.flipDy()
+			blocks = ball.collidelistall(bricks)
+			for block in blocks:
+				bally = ball.y + ball.h / 2
+				ballx = ball.x + ball.w / 2
+				if block >= len(bricks):
+					continue
+				if (bricks[block].collidepoint(ball.x, bally) or \
+					bricks[block].collidepoint(ball.x + ball.w, bally)):
+					ball.flipDx()
+					bricks.pop(block)
+				elif bricks[block].collidepoint(ballx, ball.y) or \
+						bricks[block].collidepoint(ballx, ball.y + ball.h):
+					ball.flipDy()
+					bricks.pop(block)
 
 		else: # state is new
 			ball.left = paddle.left + 12

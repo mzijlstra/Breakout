@@ -47,6 +47,8 @@ class Ball(pygame.Rect):
 
 class Paddle(pygame.Rect):
 	img = pygame.image.load('paddle.png')
+	trackA = pygame.image.load('Track A.png')
+	trackB = pygame.image.load('Track B.png')
 
 	def __init__(self, x=0.0, y=0.0):
 		"""Constructor: loads image, initializes position and speed 
@@ -76,6 +78,7 @@ class Paddle(pygame.Rect):
 	def display(self, surface):
 		'Blits paddle image to the given surface'
 		surface.blit(Paddle.img, self)
+		surface.blit(Paddle.trackA, (self.x, self.y + 8))
 
 class Brick(pygame.Rect):
 	img = pygame.image.load('brick3.png')
@@ -118,6 +121,8 @@ def main():
 
 	#optimize images
 	Paddle.img = Paddle.img.convert_alpha()
+	Paddle.trackA = Paddle.trackA.convert_alpha()
+	Paddle.trackB = Paddle.trackB.convert_alpha()
 	Ball.img = Ball.img.convert_alpha()
 	Brick.img = Brick.img.convert_alpha()
 
@@ -149,26 +154,26 @@ def main():
 
 		keys = pygame.key.get_pressed()
 		# move paddle based on left and right arrows
-		#if keys[pygame.K_LEFT] and paddle.left > 0:
-		#	paddle.moveLeft()
-		#if keys[pygame.K_RIGHT] and paddle.right < width:
-		#	paddle.moveRight()
+		if keys[pygame.K_LEFT] and paddle.left > 0:
+			paddle.moveLeft()
+		if keys[pygame.K_RIGHT] and paddle.right < width:
+			paddle.moveRight()
 
 		# move paddle based on mouse
-		(mx, my) = pygame.mouse.get_pos()
-		if my > 640 - paddle.h:
-			my = 640 - paddle.h
-		elif my < 240:
-			my = 240
+		#(mx, my) = pygame.mouse.get_pos()
+		#if my > 640 - paddle.h:
+		#	my = 640 - paddle.h
+		#elif my < 240:
+		#	my = 240
 
-		paddlehw = paddle.w / 2
-		if mx < paddlehw:
-			mx = paddlehw
-		elif mx > 640 - paddlehw:
-			mx = paddlehw
+		#paddlehw = paddle.w / 2
+		#if mx < paddlehw:
+		#	mx = paddlehw
+		#elif mx > 640 - paddlehw:
+		#	mx = paddlehw
 
-		paddle.x = mx - paddlehw
-		paddle.y = my
+		#paddle.x = mx - paddlehw
+		#paddle.y = my
 
 		# move each block
 		for brick in bricks:

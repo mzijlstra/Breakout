@@ -1,8 +1,8 @@
-import pygame, os, sys, random
+import pygame, os, sys, random, math
 
 class Ball(pygame.Rect):
 	"""Ball class for use in Pong and Breakout"""
-	img = pygame.image.load('ball4.png')
+	img = pygame.image.load('gfx/ball.png')
 
 	def __init__(self, x=0.0, y=0.0):
 		"""Constructor: loads image, initializes position and speed 
@@ -46,17 +46,16 @@ class Ball(pygame.Rect):
 		self.dy = -abs(self.dy)
 
 class Paddle(pygame.Rect):
-	img = pygame.image.load('paddle.png')
-	trackA = pygame.image.load('Track A.png')
-	trackB = pygame.image.load('Track B.png')
+	paddles = pygame.image.load('gfx/Paddle Rotations.png')
+	tracks = pygame.image.load('gfx/Track Rotations.png')
 
 	def __init__(self, x=0.0, y=0.0):
 		"""Constructor: loads image, initializes position and speed 
 		optional x and y parameters set initial position"""
 
 		# run super class constructor first
-		rect = Paddle.img.get_rect()
-		pygame.Rect.__init__(self, x, y, rect.w, rect.h)
+		#rect = Paddle.img.get_rect()
+		pygame.Rect.__init__(self, x, y, 32, 8)
 
 		# precision position (floats)
 		self.px = x
@@ -64,6 +63,9 @@ class Paddle(pygame.Rect):
 
 		# speed
 		self.speed = 2.5
+
+		# angle
+		self.angle = 0.0
 	
 	def moveLeft(self):
 		'Moves paddle left'
@@ -75,13 +77,26 @@ class Paddle(pygame.Rect):
 		self.px += self.speed
 		self.x = self.px
 
+	def rotateLeft(self):
+		self.angle = (self.angle - 1) % 360
+
+	def rotateRight(self):
+		self.angle = (self.angle + 1) % 360
+
+
 	def display(self, surface):
 		'Blits paddle image to the given surface'
-		surface.blit(Paddle.img, self)
-		surface.blit(Paddle.trackA, (self.x, self.y + 8))
+		frame = int((self.angle % 180) / 11.25)
+		area = pygame.Rect(frame * 32,0,32,32)
+		# determine track location relative to paddle
+		rad = math.radians(self.angle)
+		dx = -6*math.sin(rad)
+		dy = +6*math.cos(rad)
+		surface.blit(Paddle.tracks, (self.x + dx, self.y - 12 + dy), area)
+		surface.blit(Paddle.paddles, (self.x, self.y - 12), area)
 
 class Brick(pygame.Rect):
-	img = pygame.image.load('brick3.png')
+	img = pygame.image.load('gfx/brick.png')
 
 	def __init__(self, x, y, w, h, dx):
 		'constructor, rect stuff plus dx'
@@ -111,7 +126,8 @@ def main():
 	screen = pygame.display.set_mode(size)
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
-	back = pygame.image.load('background.png').convert()
+	back = pygame.image.load('gfx/background.png').convert()
+	#terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
@@ -120,9 +136,8 @@ def main():
 	brickrect = Brick.img.get_rect()
 
 	#optimize images
-	Paddle.img = Paddle.img.convert_alpha()
-	Paddle.trackA = Paddle.trackA.convert_alpha()
-	Paddle.trackB = Paddle.trackB.convert_alpha()
+	Paddle.paddles = Paddle.paddles.convert_alpha()
+	Paddle.tracks = Paddle.tracks.convert_alpha()
 	Ball.img = Ball.img.convert_alpha()
 	Brick.img = Brick.img.convert_alpha()
 
@@ -158,23 +173,12 @@ def main():
 			paddle.moveLeft()
 		if keys[pygame.K_RIGHT] and paddle.right < width:
 			paddle.moveRight()
-
-		# move paddle based on mouse
-		#(mx, my) = pygame.mouse.get_pos()
-		#if my > 640 - paddle.h:
-		#	my = 640 - paddle.h
-		#elif my < 240:
-		#	my = 240
-
-		#paddlehw = paddle.w / 2
-		#if mx < paddlehw:
-		#	mx = paddlehw
-		#elif mx > 640 - paddlehw:
-		#	mx = paddlehw
-
-		#paddle.x = mx - paddlehw
-		#paddle.y = my
-
+		# change paddle angle based on A and D
+		if keys[pygame.K_d] and paddle.left > 0:
+			paddle.rotateRight()
+		if keys[pygame.K_a] and paddle.right < width:
+			paddle.rotateLeft()
+		
 		# move each block
 		for brick in bricks:
 			brick.update()
@@ -221,8 +225,12 @@ def main():
 					bricks.pop(block)
 
 		else: # state is new
-			ball.left = paddle.left + 12
-			ball.top = paddle.top - 8
+			rad = math.radians(-paddle.angle)
+			dx = -6*math.sin(rad)
+			dy = +6*math.cos(rad)
+
+			ball.left = paddle.left + 12 +dx
+			ball.top = paddle.top - dy
 
 			if keys[pygame.K_SPACE]:
 				#ball goes up, random angle
@@ -238,8 +246,8 @@ def main():
 			
 
 		#draw screen
-		#screen.fill(black)
 		screen.blit(back, screen.get_rect())
+		#screen.blit(terrain, (0, 240));
 		ball.display(screen)
 		paddle.display(screen)
 		for b in bricks:

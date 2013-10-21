@@ -1,6 +1,53 @@
 import pygame, os, sys, random, math
 
-class Ball(pygame.Rect):
+def getDeg(dx, dy):
+	'Helper function that returns degree based on slope'
+	hyp = math.hypot(dx, dy)
+	if hyp == 0:
+		return 0.0
+	deg = math.degrees(math.acos(dx / hyp))
+	if dy < 0:
+		deg = 360 - deg
+	return deg
+
+
+class Movable(pygame.Rect):
+	'Super class for movable game objects'
+
+	def __init__(self, x, y, w, h, vel=0.0, angle=0.0):
+		# init super class
+		pygame.Rect.__init__(self, x, y, w, h)
+		
+		# precision (float) x and y 
+		self.px = float(x)
+		self.py = float(y)
+		self.vel = vel
+		self.angle = angle
+		
+		# dx and dy determined by vel and angle - kept as cache
+		rad = math.radians(self.angle)
+		self.dx = math.cos(rad) * self.vel
+		self.dy = math.sin(rad) * self.vel
+
+	def update(self):
+		self.px += self.dx
+		self.py += self.dy
+		self.x = int(self.px)
+		self.y = int(self.py)
+
+	def applyForce(self, vel, direction, dbg=False):
+		rad = math.radians(direction)
+		new_dx = math.cos(rad) * vel
+		new_dy = math.sin(rad) * vel
+
+		if dbg:
+			print self.dx, new_dx
+		self.dx = self.dx + new_dx
+		self.dy = self.dy + new_dy
+		self.vel = math.hypot(self.dx, self.dy)
+		self.angle = getDeg(self.dx, self.dy)
+
+class Ball(Movable):
 	"""Ball class for use in Pong and Breakout"""
 	img = pygame.image.load('gfx/ball.png')
 
@@ -10,24 +57,18 @@ class Ball(pygame.Rect):
 
 		# run super class constructor first
 		rect = Ball.img.get_rect()
-		pygame.Rect.__init__(self, x, y, rect.w, rect.h)
-
-		# precision position (floats)
-		self.px = x
-		self.py = y
-
-		# speed
-		self.dx = 0.0
-		self.dy = 0.0
+		Movable.__init__(self, x, y, rect.w, rect.h)
 
 	def update(self):
-		'updated ball position based on speed'
-		self.px += self.dx
-		self.py += self.dy
+		Movable.update(self)
 
-		# also update interal rect
-		self.x = self.px
-		self.y = self.py
+		if self.x < 0 or self.x > 640 - self.w: 
+			self.flipDx()
+			Movable.update(self)
+
+		if self.y < 0:
+			self.flipDy()
+			Movable.update(self)
 
 	def display(self, surface):
 		'Blits ball image to the give surface'
@@ -35,84 +76,108 @@ class Ball(pygame.Rect):
 
 	def flipDx(self):
 		"Flips the ball's horizontal speed from pos to neg or visa versa"
-		self.dx = -self.dx
+		self.applyForce(self.dx*2, 180)# always 180 because dx can be min!
 
 	def flipDy(self):
 		"Flips the ball's vertical speed from pos to neg or visa versa"
-		self.dy = -self.dy
+		self.applyForce(self.dy*2, 270) # always 270 because dy can be min!
 
 	def goUp(self):
 		"Ensures that dy is set to make ball go up"
-		self.dy = -abs(self.dy)
+		if self.dy > 0:
+			self.applyForce(self.dy*2, 270)
 
-class Paddle(pygame.Rect):
+class Paddle(Movable):
 	paddles = pygame.image.load('gfx/Paddle Rotations.png')
 	tracks = pygame.image.load('gfx/Track Rotations.png')
 
 	def __init__(self, x=0.0, y=0.0):
-		"""Constructor: loads image, initializes position and speed 
+		"""Constructor: loads images, initializes position  
 		optional x and y parameters set initial position"""
 
 		# run super class constructor first
 		#rect = Paddle.img.get_rect()
-		pygame.Rect.__init__(self, x, y, 32, 8)
+		Movable.__init__(self, x, y, 32, 8)
 
-		# precision position (floats)
-		self.px = x
-		self.py = y
+		# acceleration
+		self.accel = 3.0
 
-		# speed
-		self.speed = 2.5
+		# Track rotation
+		self.trot = 0.0
 
-		# angle
-		self.angle = 0.0
-	
+		# Paddle rotation
+		self.prot = 0.0
+
 	def moveLeft(self):
 		'Moves paddle left'
-		self.px -= self.speed
-		self.x = self.px
+		self.applyForce(self.accel, 180 + self.trot)
 
 	def moveRight(self):
 		'Moves paddle right'
-		self.px += self.speed
-		self.x = self.px
+		self.applyForce(self.accel, self.trot)
 
 	def rotateLeft(self):
-		self.angle = (self.angle - 1) % 360
+		self.trot = (self.trot - 1) % 360
 
 	def rotateRight(self):
-		self.angle = (self.angle + 1) % 360
+		self.trot = (self.trot + 1) % 360
 
+	def update(self):
+		# apply gravity
+		#self.applyForce(1.0, 90)
 
+		 #slow down due to friction
+		if self.vel < 0.25:
+			self.applyForce(self.vel, self.angle - 180)
+		else:
+			self.applyForce(self.vel * 0.25, self.angle - 180)
+
+		Movable.update(self)
+
+		# make sure we don't fall off the screen
+		if self.x > 640 - self.w:
+			self.applyForce(self.dx, 180)
+			Movable.update(self)
+		elif self.x < 0:
+			self.applyForce(self.dx, 180) # 180 because dx negative
+			Movable.update(self)
+
+		if self.y > 480 - self.h:
+			self.py = 480 - self.h
+		elif self.y < 0:
+			self.py = 0
+	
 	def display(self, surface):
 		'Blits paddle image to the given surface'
-		frame = int((self.angle % 180) / 11.25)
+		# determine rotation frame on spritesheet
+		frame = int((self.trot % 180) / 11.25)
 		area = pygame.Rect(frame * 32,0,32,32)
 		# determine track location relative to paddle
-		rad = math.radians(self.angle)
+		rad = math.radians(self.trot)
 		dx = -6*math.sin(rad)
 		dy = +6*math.cos(rad)
+		# blit the tracks and the paddle
 		surface.blit(Paddle.tracks, (self.x + dx, self.y - 12 + dy), area)
 		surface.blit(Paddle.paddles, (self.x, self.y - 12), area)
 
-class Brick(pygame.Rect):
+class Brick(Movable):
 	img = pygame.image.load('gfx/brick.png')
 
-	def __init__(self, x, y, w, h, dx):
+	def __init__(self, x, y, w, h):
 		'constructor, rect stuff plus dx'
-		pygame.Rect.__init__(self, x, y, w, h)
-		self.dx = dx
+		Movable.__init__(self, x, y, w, h)
 
 	def display(self, surface):
 		'Blits brick image to the given surface'
 		surface.blit(Brick.img, self)
 
 	def update(self):
-		self.x += self.dx
+		Movable.update(self)
+
 		if self.x > 640:
-			self.x = -32;
+			self.px = -32.0
 		if self.x < -32:
-			self.x = 640
+			self.px = 640.0
 
 
 def main():
@@ -121,7 +186,6 @@ def main():
 	pygame.init()
 
 	# general vars
-	black = 0, 0, 0
 	size = width, height = 640, 480
 	screen = pygame.display.set_mode(size)
 	clock = pygame.time.Clock()
@@ -151,10 +215,12 @@ def main():
 		for col in range(cols):
 			x = col * brickW
 			y = 32 + row * brickH * 3
-			dx = 1
+			brick = Brick(x, y, brickW, brickH)
 			if row % 2 == 0:
-				dx = -1
-			bricks.append(Brick(x, y, brickW, brickH, dx))
+				brick.applyForce(1, 0)
+			else:
+				brick.applyForce(1, 180)
+			bricks.append(brick)
 
 	# game loop
 	while True:
@@ -178,6 +244,9 @@ def main():
 			paddle.rotateRight()
 		if keys[pygame.K_a] and paddle.right < width:
 			paddle.rotateLeft()
+
+		# move the paddle
+		paddle.update()
 		
 		# move each block
 		for brick in bricks:
@@ -187,19 +256,13 @@ def main():
 			# move ball based on it's own dx/dy
 			ball.update()
 
-			# bounce against screen top, left and right 
-			if ball.left < 0 or ball.right > width:
-				ball.flipDx()
-			if ball.top < 0: # or ball.bottom > height:
-				ball.flipDy()
-				
 			# if we hit the paddle
 			if ball.colliderect(paddle):
 				ball.goUp()
 				# random dx after paddle hit
 				#ball.dx = random.uniform(-3,3)
-				dx = (ball.x + ball.w / 2) - (paddle.x + paddle.w / 2)
-				ball.dx = dx / float(paddle.w) * 6.0;
+				#dx = (ball.x + ball.w / 2) - (paddle.x + paddle.w / 2)
+				#ball.dx = dx / float(paddle.w) * 6.0;
 
 				# make sure we exit the paddle right away
 				ball.update()
@@ -217,6 +280,8 @@ def main():
 					continue
 				if (bricks[block].collidepoint(ball.x, bally) or \
 					bricks[block].collidepoint(ball.x + ball.w, bally)):
+					# apply force when hitting brick left/right
+					ball.applyForce(bricks[block].vel, bricks[block].angle)
 					ball.flipDx()
 					bricks.pop(block)
 				elif bricks[block].collidepoint(ballx, ball.y) or \
@@ -225,23 +290,20 @@ def main():
 					bricks.pop(block)
 
 		else: # state is new
-			rad = math.radians(-paddle.angle)
-			dx = -6*math.sin(rad)
-			dy = +6*math.cos(rad)
+			# ball stays on top of paddle
+			rad = math.radians(-paddle.trot)
+			dx = -8*math.sin(rad)
+			dy = +8*math.cos(rad)
 
-			ball.left = paddle.left + 12 +dx
-			ball.top = paddle.top - dy
+			ball.px = paddle.px + 12 +dx
+			ball.py = paddle.py - dy
+			ball.dx = 0
+			ball.dy = 0
+			ball.update()
 
 			if keys[pygame.K_SPACE]:
-				#ball goes up, random angle
-				ball.dy = -2
-				ball.dx = random.uniform(-3, 3)
-
-				#prepare precision movement
-				ball.px = ball.x
-				ball.py = ball.y
-
-				#go to playing state
+				ball.applyForce(3, random.uniform(-115, -65))
+				ball.update()
 				state = 'playing'
 			
 

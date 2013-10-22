@@ -14,7 +14,7 @@ def getDeg(dx, dy):
 class Movable(pygame.Rect):
 	'Super class for movable game objects'
 
-	def __init__(self, x, y, w, h, vel=0.0, angle=0.0):
+	def __init__(self, x, y, w, h, vel=0.0, direction=0.0):
 		# init super class
 		pygame.Rect.__init__(self, x, y, w, h)
 		
@@ -22,12 +22,8 @@ class Movable(pygame.Rect):
 		self.px = float(x)
 		self.py = float(y)
 		self.vel = vel
-		self.angle = angle
-		
-		# dx and dy determined by vel and angle - kept as cache
-		rad = math.radians(self.angle)
-		self.dx = math.cos(rad) * self.vel
-		self.dy = math.sin(rad) * self.vel
+		self.direction = direction
+		self.fixDxDy();
 
 	def update(self):
 		self.px += self.dx
@@ -35,17 +31,31 @@ class Movable(pygame.Rect):
 		self.x = int(self.px)
 		self.y = int(self.py)
 
-	def applyForce(self, vel, direction, dbg=False):
+	def applyForce(self, vel, direction):
 		rad = math.radians(direction)
 		new_dx = math.cos(rad) * vel
 		new_dy = math.sin(rad) * vel
 
-		if dbg:
-			print self.dx, new_dx
 		self.dx = self.dx + new_dx
 		self.dy = self.dy + new_dy
+		self.fixVelDir()
+
+	def stop(self):
+		self.vel = 0
+		self.direction = 0
+		self.dx = 0
+		self.dy = 0
+
+	def fixDxDy(self):
+		rad = math.radians(self.direction)
+		self.dx = math.cos(rad) * self.vel
+		self.dy = math.sin(rad) * self.vel
+
+	def fixVelDir(self):
 		self.vel = math.hypot(self.dx, self.dy)
-		self.angle = getDeg(self.dx, self.dy)
+		self.direction = getDeg(self.dx, self.dy)
+
+		
 
 class Ball(Movable):
 	"""Ball class for use in Pong and Breakout"""
@@ -76,16 +86,21 @@ class Ball(Movable):
 
 	def flipDx(self):
 		"Flips the ball's horizontal speed from pos to neg or visa versa"
-		self.applyForce(self.dx*2, 180)# always 180 because dx can be min!
+		#self.applyFddorce(self.dx*2, 180)#always 180 because dx can be min!
+		self.dx = -self.dx
+		self.fixVelDir()
 
 	def flipDy(self):
 		"Flips the ball's vertical speed from pos to neg or visa versa"
-		self.applyForce(self.dy*2, 270) # always 270 because dy can be min!
+		#self.applyForce(self.dy*2, 270) # always 270 because dy can be min!
+		self.dy = -self.dy
+		self.fixVelDir()
 
 	def goUp(self):
 		"Ensures that dy is set to make ball go up"
 		if self.dy > 0:
-			self.applyForce(self.dy*2, 270)
+			self.dy = -self.dy
+			self.fixVelDir()
 
 class Paddle(Movable):
 	paddles = pygame.image.load('gfx/Paddle Rotations.png')
@@ -100,7 +115,7 @@ class Paddle(Movable):
 		Movable.__init__(self, x, y, 32, 8)
 
 		# acceleration
-		self.accel = 3.0
+		self.accel = 2.0
 
 		# Track rotation
 		self.trot = 0.0
@@ -116,36 +131,55 @@ class Paddle(Movable):
 		'Moves paddle right'
 		self.applyForce(self.accel, self.trot)
 
-	def rotateLeft(self):
-		self.trot = (self.trot - 1) % 360
+#	def rotateLeft(self):
+#		self.trot = (self.trot - 1) % 360
+#
+#	def rotateRight(self):
+#		self.trot = (self.trot + 1) % 360
 
-	def rotateRight(self):
-		self.trot = (self.trot + 1) % 360
-
-	def update(self):
+	def update(self, terrain):
 		# apply gravity
-		#self.applyForce(1.0, 90)
+		self.applyForce(1.0, 90)
 
 		 #slow down due to friction
-		if self.vel < 0.25:
-			self.applyForce(self.vel, self.angle - 180)
+		if self.vel < 0.15:
+			self.applyForce(self.vel, self.direction - 180)
 		else:
-			self.applyForce(self.vel * 0.25, self.angle - 180)
+			self.applyForce(self.vel * 0.20, self.direction - 180)
 
+		# do the actual move
 		Movable.update(self)
 
 		# make sure we don't fall off the screen
 		if self.x > 640 - self.w:
-			self.applyForce(self.dx, 180)
-			Movable.update(self)
+			self.stop()
+			self.x = self.px = 640 - self.w
 		elif self.x < 0:
-			self.applyForce(self.dx, 180) # 180 because dx negative
-			Movable.update(self)
+			self.stop()
+			self.x = self.px = 0
 
 		if self.y > 480 - self.h:
-			self.py = 480 - self.h
+			self.stop()
+			self.y = self.py = 480 - self.h
 		elif self.y < 0:
-			self.py = 0
+			self.stop()
+			self.y = self.py = 0
+
+		# make sure we're on top of the terrain
+		pxarray = pygame.PixelArray(terrain)
+		dug_in = False
+		x, y = self.x + self.w/2, self.y - 240 + 14
+		while pxarray[x][y] >> 24 != 0:
+			dug_in = True
+			self.py -= 1
+			y = self.y = int(self.py)
+		if dug_in:
+			self.dy = 0
+			self.fixVelDir()
+
+		# make sure we're rotated correctly
+		del pxarray
+
 	
 	def display(self, surface):
 		'Blits paddle image to the given surface'
@@ -191,10 +225,11 @@ def main():
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
 	back = pygame.image.load('gfx/background.png').convert()
-	#terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
+	terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
+
 	ball = Ball()
 	bricks = []
 	brickrect = Brick.img.get_rect()
@@ -246,7 +281,7 @@ def main():
 			paddle.rotateLeft()
 
 		# move the paddle
-		paddle.update()
+		paddle.update(terrain)
 		
 		# move each block
 		for brick in bricks:
@@ -281,7 +316,7 @@ def main():
 				if (bricks[block].collidepoint(ball.x, bally) or \
 					bricks[block].collidepoint(ball.x + ball.w, bally)):
 					# apply force when hitting brick left/right
-					ball.applyForce(bricks[block].vel, bricks[block].angle)
+					ball.applyForce(bricks[block].vel, bricks[block].direction)
 					ball.flipDx()
 					bricks.pop(block)
 				elif bricks[block].collidepoint(ballx, ball.y) or \
@@ -309,7 +344,7 @@ def main():
 
 		#draw screen
 		screen.blit(back, screen.get_rect())
-		#screen.blit(terrain, (0, 240));
+		screen.blit(terrain, (0, 240));
 		ball.display(screen)
 		paddle.display(screen)
 		for b in bricks:

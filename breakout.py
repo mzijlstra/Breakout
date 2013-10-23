@@ -143,7 +143,7 @@ class Paddle(Movable):
 
 		 #slow down due to friction
 		if self.vel < 0.15:
-			self.applyForce(self.vel, self.direction - 180)
+			self.stop()
 		else:
 			self.applyForce(self.vel * 0.20, self.direction - 180)
 
@@ -172,7 +172,9 @@ class Paddle(Movable):
 		while pxarray[x][y] >> 24 != 0:
 			dug_in = True
 			self.py -= 1
-			y = self.y = int(self.py)
+			self.y = int(self.py)
+			y = self.y - 240 + 14
+
 		if dug_in:
 			self.dy = 0
 			self.fixVelDir()

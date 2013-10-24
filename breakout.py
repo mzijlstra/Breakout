@@ -165,21 +165,40 @@ class Paddle(Movable):
 			self.stop()
 			self.y = self.py = 0
 
-		# make sure we're on top of the terrain
+		# we want to look 14 pixels 'below' (rotated) tracks 
+		rad = math.radians(self.trot)
+		x = int(-15*math.sin(rad))
+		y = int(+15*math.cos(rad))
+
+		# find top of terrain for left side of track 
 		pxarray = pygame.PixelArray(terrain)
-		dug_in = False
-		x, y = self.x + self.w/2, self.y - 240 + 14
-		while pxarray[x][y] >> 24 != 0:
-			dug_in = True
-			self.py -= 1
-			self.y = int(self.py)
-			y = self.y - 240 + 14
+		left_dug_in = False
+		lx, ly = x + self.x + 2, y + self.y - 240
+		if (0 < lx < 640 and 0 < ly < 240):
+			while pxarray[lx][ly] >> 24 != 0:
+				left_dug_in = True
+				ly -= 1
 
-		if dug_in:
-			self.dy = 0
-			self.fixVelDir()
 
-		# make sure we're rotated correctly
+		# find top of terrain for right side of track
+		right_dug_in = False
+		rx, ry = x + self.x + self.w - 2, y + self.y - 240
+		if (0 < rx < 640 and 0 < ry < 240):
+			while pxarray[rx][ry] >> 24 != 0:
+				right_dug_in = True
+				ry -= 1
+
+		# rotate tracks 
+		if left_dug_in or right_dug_in:
+			dy = ry - ly
+			dx = rx - lx
+			self.trot = getDeg(dx, dy)
+			if ly > ry:
+				self.py = self.y = ly + 240 - 14
+			else:
+				self.py = self.y = ry + 240 - 14
+
+		# clean up pxarray
 		del pxarray
 
 	

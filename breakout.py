@@ -115,7 +115,7 @@ class Paddle(Movable):
 		Movable.__init__(self, x, y, 32, 8)
 
 		# acceleration
-		self.accel = 2.0
+		self.accel = .75
 
 		# Track rotation
 		self.trot = 0.0
@@ -123,13 +123,20 @@ class Paddle(Movable):
 		# Paddle rotation
 		self.prot = 0.0
 
+		# paddle state
+		self.flying = False
+		self.brk = False
+
+
 	def moveLeft(self):
 		'Moves paddle left'
-		self.applyForce(self.accel, 180 + self.trot)
+		if not self.flying:
+			self.applyForce(self.accel, 180 + self.trot)
 
 	def moveRight(self):
 		'Moves paddle right'
-		self.applyForce(self.accel, self.trot)
+		if not self.flying:
+			self.applyForce(self.accel, self.trot)
 
 #	def rotateLeft(self):
 #		self.trot = (self.trot - 1) % 360
@@ -138,14 +145,85 @@ class Paddle(Movable):
 #		self.trot = (self.trot + 1) % 360
 
 	def update(self, terrain):
-		# apply gravity
-		self.applyForce(1.0, 90)
+		# we want to look 14 pixels 'below' (rotated) top of paddle
+		rad = math.radians(self.trot)
+		x = int(-14*math.sin(rad))
+		y = int(+14*math.cos(rad))
 
-		 #slow down due to friction
-		if self.vel < 0.15:
-			self.stop()
+		# find top of terrain for left side of track 
+		pxarray = pygame.PixelArray(terrain)
+		lground = False
+		lx, ly = x + self.x + 2, y + self.y - 240
+		if (0 < lx < 640 and 0 < ly < 240):
+			while pxarray[lx][ly] >> 24 != 0:
+				lground = True
+				ly -= 1
+
+		# find top of terrain for right side of track
+		rground = False
+		rx, ry = x + self.x + self.w - 2, y + self.y - 240
+		if (0 < rx < 640 and 0 < ry < 240):
+			while pxarray[rx][ry] >> 24 != 0:
+				rground = True
+				ry -= 1
+
+		# rotate tracks 
+		if lground or rground:
+			self.flying = False
+			# find where ground below left is
+			if not lground:
+				ch = 1 # change
+				while lx > 0 and pxarray[lx][ly + ch] >> 24 == 0 and ch < 5:
+					ch += 1
+				ly += ch
+
+			# find where ground below right is
+			if not rground:
+				ch = 0 # change
+				while rx < 640 and pxarray[rx][ry + ch] >> 24 == 0 and ch < 5:
+					ch += 1
+				ry += ch
+
+			# do the actual rotation
+			deg = getDeg(rx - lx, ry - ly)
+			self.trot = deg
 		else:
-			self.applyForce(self.vel * 0.20, self.direction - 180)
+			self.flying = True
+
+		# move sprite up or down as needed
+		if ly > ry:
+			self.py = self.y = ly + 240 - 14
+		else:
+			self.py = self.y = ry + 240 - 14
+
+		# clean up pxarray
+		del pxarray
+
+		# apply gravity, keeping in mind rotation
+		if not lground and not rground:
+			self.applyForce(1.0, 90)
+		else:
+			deg = self.trot
+			if deg < 0:
+				deg += 180
+			elif deg > 180:
+				deg -= 180
+			force = (90 - abs(deg - 90)) / 90 
+			self.applyForce(force, deg)
+
+		#slow down due to friction or breaking
+		if self.flying:
+			self.applyForce(self.vel * 0.05, self.direction - 180)
+		elif self.brk:
+			if self.vel < 0.5:
+				self.stop()
+			else:
+				self.applyForce(self.vel * 0.25, self.direction - 180)
+		else:
+			if self.vel < 0.1:
+				self.stop()
+			else:
+				self.applyForce(self.vel * 0.1, self.direction - 180)
 
 		# do the actual move
 		Movable.update(self)
@@ -165,41 +243,6 @@ class Paddle(Movable):
 			self.stop()
 			self.y = self.py = 0
 
-		# we want to look 14 pixels 'below' (rotated) tracks 
-		rad = math.radians(self.trot)
-		x = int(-15*math.sin(rad))
-		y = int(+15*math.cos(rad))
-
-		# find top of terrain for left side of track 
-		pxarray = pygame.PixelArray(terrain)
-		left_dug_in = False
-		lx, ly = x + self.x + 2, y + self.y - 240
-		if (0 < lx < 640 and 0 < ly < 240):
-			while pxarray[lx][ly] >> 24 != 0:
-				left_dug_in = True
-				ly -= 1
-
-
-		# find top of terrain for right side of track
-		right_dug_in = False
-		rx, ry = x + self.x + self.w - 2, y + self.y - 240
-		if (0 < rx < 640 and 0 < ry < 240):
-			while pxarray[rx][ry] >> 24 != 0:
-				right_dug_in = True
-				ry -= 1
-
-		# rotate tracks 
-		if left_dug_in or right_dug_in:
-			dy = ry - ly
-			dx = rx - lx
-			self.trot = getDeg(dx, dy)
-			if ly > ry:
-				self.py = self.y = ly + 240 - 14
-			else:
-				self.py = self.y = ry + 240 - 14
-
-		# clean up pxarray
-		del pxarray
 
 	
 	def display(self, surface):
@@ -240,6 +283,12 @@ def main():
 	os.environ['SDL_VIDEO_CENTERED'] = '1'
 	pygame.init()
 
+	joy = False
+	joys = pygame.joystick.get_count()
+	if joys > 0:
+		joy = pygame.joystick.Joystick(0)
+		joy.init()
+
 	# general vars
 	size = width, height = 640, 480
 	screen = pygame.display.set_mode(size)
@@ -250,7 +299,6 @@ def main():
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
-
 	ball = Ball()
 	bricks = []
 	brickrect = Brick.img.get_rect()
@@ -284,22 +332,25 @@ def main():
 		# quit on window close or escape key
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT \
-			   or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+			   or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE) \
+			   or (event.type == pygame.JOYBUTTONDOWN and event.button == 5):
 				pygame.quit()
 				sys.exit()
+
+			if (event.type == pygame.KEYDOWN and event.key == pygame.K_LCTRL) or \
+					(event.type == pygame.JOYBUTTONDOWN and event.button == 12):
+				paddle.brk = True
+			if (event.type == pygame.KEYUP and event.key == pygame.K_LCTRL) or \
+					(event.type == pygame.JOYBUTTONUP and event.button == 12):
+				paddle.brk = False
 
 
 		keys = pygame.key.get_pressed()
 		# move paddle based on left and right arrows
-		if keys[pygame.K_LEFT] and paddle.left > 0:
+		if keys[pygame.K_LEFT] or (joy and joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2):
 			paddle.moveLeft()
-		if keys[pygame.K_RIGHT] and paddle.right < width:
+		if keys[pygame.K_RIGHT] or (joy and joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2):
 			paddle.moveRight()
-		# change paddle angle based on A and D
-		if keys[pygame.K_d] and paddle.left > 0:
-			paddle.rotateRight()
-		if keys[pygame.K_a] and paddle.right < width:
-			paddle.rotateLeft()
 
 		# move the paddle
 		paddle.update(terrain)
@@ -357,7 +408,7 @@ def main():
 			ball.dy = 0
 			ball.update()
 
-			if keys[pygame.K_SPACE]:
+			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)):
 				ball.applyForce(3, random.uniform(-115, -65))
 				ball.update()
 				state = 'playing'

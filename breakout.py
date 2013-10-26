@@ -1,4 +1,5 @@
 import pygame, os, sys, random, math
+import pygame.gfxdraw
 
 def getDeg(dx, dy):
 	'Helper function that returns degree based on slope'
@@ -101,6 +102,29 @@ class Ball(Movable):
 		if self.dy > 0:
 			self.dy = -self.dy
 			self.fixVelDir()
+
+
+
+class Brick(Movable):
+	img = pygame.image.load('gfx/brick.png')
+
+	def __init__(self, x, y, w, h):
+		'constructor, rect stuff plus dx'
+		Movable.__init__(self, x, y, w, h)
+
+	def display(self, surface):
+		'Blits brick image to the given surface'
+		surface.blit(Brick.img, self)
+
+	def update(self):
+		Movable.update(self)
+
+		if self.x > 640:
+			self.px = -32.0
+		if self.x < -32:
+			self.px = 640.0
+
+
 
 class Paddle(Movable):
 	paddles = pygame.image.load('gfx/Paddle Rotations.png')
@@ -243,7 +267,6 @@ class Paddle(Movable):
 			self.stop()
 			self.y = self.py = 0
 
-
 	
 	def display(self, surface):
 		'Blits paddle image to the given surface'
@@ -258,24 +281,6 @@ class Paddle(Movable):
 		surface.blit(Paddle.tracks, (self.x + dx, self.y - 12 + dy), area)
 		surface.blit(Paddle.paddles, (self.x, self.y - 12), area)
 
-class Brick(Movable):
-	img = pygame.image.load('gfx/brick.png')
-
-	def __init__(self, x, y, w, h):
-		'constructor, rect stuff plus dx'
-		Movable.__init__(self, x, y, w, h)
-
-	def display(self, surface):
-		'Blits brick image to the given surface'
-		surface.blit(Brick.img, self)
-
-	def update(self):
-		Movable.update(self)
-
-		if self.x > 640:
-			self.px = -32.0
-		if self.x < -32:
-			self.px = 640.0
 
 
 def main():
@@ -295,7 +300,18 @@ def main():
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
 	back = pygame.image.load('gfx/background.png').convert()
-	terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
+	#terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
+	terrain = pygame.Surface((640, 240), pygame.SRCALPHA, 32)
+	terrain = terrain.convert_alpha()
+	terrain.fill((0,0,0,0))
+
+	p = []
+	for i in range(0, 5):
+		p.append(random.randrange(140,240))
+
+	for i in range(0,100):
+		points = ((0, p[0] +i), (160, p[1] +i), (320, p[2] +i), (480, p[3] +i), (639, p[4] +i))
+		pygame.gfxdraw.bezier(terrain, points, 100, (int(200 + i*0.5),150 + i, i*2))
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
@@ -347,9 +363,9 @@ def main():
 
 		keys = pygame.key.get_pressed()
 		# move paddle based on left and right arrows
-		if keys[pygame.K_LEFT] or (joy and joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2):
+		if keys[pygame.K_LEFT] or (joy and (joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2)):
 			paddle.moveLeft()
-		if keys[pygame.K_RIGHT] or (joy and joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2):
+		if keys[pygame.K_RIGHT] or (joy and (joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2)):
 			paddle.moveRight()
 
 		# move the paddle

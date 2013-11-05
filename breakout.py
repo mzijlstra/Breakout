@@ -162,12 +162,6 @@ class Paddle(Movable):
 		if not self.flying:
 			self.applyForce(self.accel, self.trot)
 
-#	def rotateLeft(self):
-#		self.trot = (self.trot - 1) % 360
-#
-#	def rotateRight(self):
-#		self.trot = (self.trot + 1) % 360
-
 	def update(self, terrain):
 		# we want to look 14 pixels 'below' (rotated) top of paddle
 		rad = math.radians(self.trot)
@@ -381,11 +375,11 @@ def main():
 
 			# if we hit the paddle
 			if ball.colliderect(paddle):
-				ball.goUp()
-				# random dx after paddle hit
-				#ball.dx = random.uniform(-3,3)
-				#dx = (ball.x + ball.w / 2) - (paddle.x + paddle.w / 2)
-				#ball.dx = dx / float(paddle.w) * 6.0;
+				# new ball angle based on the angle of the paddle
+				angle = (paddle.trot - 90) % 360 # FIXME prot not trot
+				diff = ball.direction - angle
+				ball.direction = (ball.direction - diff) % 360
+				ball.fixDxDy()
 
 				# make sure we exit the paddle right away
 				ball.update()
@@ -403,9 +397,9 @@ def main():
 					continue
 				if (bricks[block].collidepoint(ball.x, bally) or \
 					bricks[block].collidepoint(ball.x + ball.w, bally)):
-					# apply force when hitting brick left/right
-					ball.applyForce(bricks[block].vel, bricks[block].direction)
-					ball.flipDx()
+					# apply force when hitting brick left/right ?
+					ball.applyForce(bricks[block].vel, -bricks[block].direction)
+					#ball.flipDx()
 					bricks.pop(block)
 				elif bricks[block].collidepoint(ballx, ball.y) or \
 						bricks[block].collidepoint(ballx, ball.y + ball.h):
@@ -425,7 +419,8 @@ def main():
 			ball.update()
 
 			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)):
-				ball.applyForce(3, random.uniform(-115, -65))
+				#ball.applyForce(3, random.uniform(-115, -65))
+				ball.applyForce(3, paddle.trot - 90)
 				ball.update()
 				state = 'playing'
 			

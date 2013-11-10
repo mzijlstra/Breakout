@@ -163,6 +163,13 @@ class Paddle(Movable):
 			self.applyForce(self.accel, self.trot)
 
 	def update(self, terrain):
+		# update paddle rotation based on mouse angle
+		(mx, my) = pygame.mouse.get_pos()
+		px = self.x + self.w / 2
+		py = self.y + self.h / 2
+		self.prot = getDeg(mx - px, my - py) + 90
+
+		# update track rotation based on ground
 		# we want to look 14 pixels 'below' (rotated) top of paddle
 		rad = math.radians(self.trot)
 		x = int(-14*math.sin(rad))
@@ -264,16 +271,19 @@ class Paddle(Movable):
 	
 	def display(self, surface):
 		'Blits paddle image to the given surface'
-		# determine rotation frame on spritesheet
-		frame = int((self.trot % 180) / 11.25)
-		area = pygame.Rect(frame * 32,0,32,32)
+		# determine track rotation frame on spritesheet
+		tframe = int((self.trot % 180) / 11.25)
+		tarea = pygame.Rect(tframe * 32,0,32,32)
 		# determine track location relative to paddle
 		rad = math.radians(self.trot)
 		dx = -6*math.sin(rad)
 		dy = +6*math.cos(rad)
+		#determine paddle rotation frame
+		pframe = int((self.prot % 180) / 11.25)
+		parea = pygame.Rect(pframe * 32, 0, 32, 32)
 		# blit the tracks and the paddle
-		surface.blit(Paddle.tracks, (self.x + dx, self.y - 12 + dy), area)
-		surface.blit(Paddle.paddles, (self.x, self.y - 12), area)
+		surface.blit(Paddle.tracks, (self.x + dx, self.y - 12 + dy), tarea)
+		surface.blit(Paddle.paddles, (self.x, self.y - 12), parea)
 
 
 
@@ -294,15 +304,18 @@ def main():
 	clock = pygame.time.Clock()
 	state = 'new'# either new or playing
 	back = pygame.image.load('gfx/background.png').convert()
-	#terrain = pygame.image.load('gfx/terrain.png').convert_alpha()
+
+	# create terrain with random slopes
 	terrain = pygame.Surface((640, 240), pygame.SRCALPHA, 32)
 	terrain = terrain.convert_alpha()
 	terrain.fill((0,0,0,0))
 
+	# points along x axis with random y
 	p = []
 	for i in range(0, 5):
 		p.append(random.randrange(140,240))
 
+	# draw increasingly lighter colored bezier going down
 	for i in range(0,100):
 		points = ((0, p[0] +i), (160, p[1] +i), (320, p[2] +i), (480, p[3] +i), (639, p[4] +i))
 		pygame.gfxdraw.bezier(terrain, points, 100, (int(200 + i*0.5),150 + i, i*2))
@@ -357,9 +370,11 @@ def main():
 
 		keys = pygame.key.get_pressed()
 		# move paddle based on left and right arrows
-		if keys[pygame.K_LEFT] or (joy and (joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2)):
+		if keys[pygame.K_LEFT] or keys[pygame.K_a] or \
+				(joy and (joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2)):
 			paddle.moveLeft()
-		if keys[pygame.K_RIGHT] or (joy and (joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2)):
+		if keys[pygame.K_RIGHT] or keys[pygame.K_d] or \
+				(joy and (joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2)):
 			paddle.moveRight()
 
 		# move the paddle
@@ -376,7 +391,7 @@ def main():
 			# if we hit the paddle
 			if ball.colliderect(paddle):
 				# new ball angle based on the angle of the paddle
-				angle = (paddle.trot - 90) % 360 # FIXME prot not trot
+				angle = (paddle.prot - 90) % 360 
 				diff = ball.direction - angle
 				ball.direction = (ball.direction - diff) % 360
 				ball.fixDxDy()
@@ -420,7 +435,7 @@ def main():
 
 			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)):
 				#ball.applyForce(3, random.uniform(-115, -65))
-				ball.applyForce(3, paddle.trot - 90)
+				ball.applyForce(3, paddle.prot - 90)
 				ball.update()
 				state = 'playing'
 			

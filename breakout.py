@@ -139,7 +139,7 @@ class Paddle(Movable):
 		Movable.__init__(self, x, y, 32, 8)
 
 		# acceleration
-		self.accel = .75
+		self.accel = .60
 
 		# Track rotation
 		self.trot = 0.0
@@ -162,7 +162,7 @@ class Paddle(Movable):
 		if not self.flying:
 			self.applyForce(self.accel, self.trot)
 
-	def update(self, terrain):
+	def update(self, pxarray):
 		# update paddle rotation based on mouse angle
 		(mx, my) = pygame.mouse.get_pos()
 		px = self.x + self.w / 2
@@ -176,7 +176,6 @@ class Paddle(Movable):
 		y = int(+14*math.cos(rad))
 
 		# find top of terrain for left side of track 
-		pxarray = pygame.PixelArray(terrain)
 		lground = False
 		lx, ly = x + self.x + 2, y + self.y - 240
 		if (0 < lx < 640 and 0 < ly < 240):
@@ -220,9 +219,6 @@ class Paddle(Movable):
 			self.py = self.y = ly + 240 - 14
 		else:
 			self.py = self.y = ry + 240 - 14
-
-		# clean up pxarray
-		del pxarray
 
 		# apply gravity, keeping in mind rotation
 		if not lground and not rground:
@@ -378,7 +374,8 @@ def main():
 			paddle.moveRight()
 
 		# move the paddle
-		paddle.update(terrain)
+		pxarray = pygame.PixelArray(terrain)
+		paddle.update(pxarray)
 		
 		# move each block
 		for brick in bricks:
@@ -399,10 +396,6 @@ def main():
 				# make sure we exit the paddle right away
 				ball.update()
 
-			# ball goes off screen at the bottom / change to new ball
-			if ball.bottom > height:
-				state = 'new'
-
 			# check block collisions
 			blocks = ball.collidelistall(bricks)
 			for block in blocks:
@@ -412,14 +405,23 @@ def main():
 					continue
 				if (bricks[block].collidepoint(ball.x, bally) or \
 					bricks[block].collidepoint(ball.x + ball.w, bally)):
-					# apply force when hitting brick left/right ?
+					# apply force when hitting brick left/right 
 					ball.applyForce(bricks[block].vel, -bricks[block].direction)
-					#ball.flipDx()
 					bricks.pop(block)
 				elif bricks[block].collidepoint(ballx, ball.y) or \
 						bricks[block].collidepoint(ballx, ball.y + ball.h):
 					ball.flipDy()
 					bricks.pop(block)
+
+			# check if ball hits ground, change to new ball
+			if ball.top > 240 and pxarray[ball.x + ball.w / 2][ball.top - 240] >> 24 != 0:
+				state = 'new'
+				# splash ball onto ground
+				for x in range(ball.left, ball.right + 1):
+					pxarray[x][ball.top - 240] = (255, 255, 255, 1)
+
+
+			
 
 		else: # state is new
 			# ball stays on top of paddle
@@ -432,13 +434,16 @@ def main():
 			ball.dx = 0
 			ball.dy = 0
 			ball.update()
-
-			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)):
+			
+			(b1, b2, b3) = pygame.mouse.get_pressed()
+			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)) or b1:
 				#ball.applyForce(3, random.uniform(-115, -65))
 				ball.applyForce(3, paddle.prot - 90)
 				ball.update()
 				state = 'playing'
 			
+		# clean up
+		del pxarray
 
 		#draw screen
 		screen.blit(back, screen.get_rect())

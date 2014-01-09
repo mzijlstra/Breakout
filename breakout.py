@@ -168,6 +168,14 @@ class Paddle(Movable):
 		px = self.x + self.w / 2
 		py = self.y + self.h / 2
 		self.prot = getDeg(mx - px, my - py) + 90
+		self.prot = self.prot % 360
+
+		# make sure paddle can not turn more than 30 over track 
+		dist = self.prot - self.trot
+		if 45 < dist < 180:
+			self.prot = self.trot + 30
+		if 180 < dist < 315:
+			self.prot = self.trot - 30
 
 		# update track rotation based on ground
 		# we want to look 14 pixels 'below' (rotated) top of paddle
@@ -420,8 +428,6 @@ def main():
 				for x in range(ball.left, ball.right + 1):
 					pxarray[x][ball.top - 240] = (255, 255, 255, 1)
 
-
-			
 
 		else: # state is new
 			# ball stays on top of paddle

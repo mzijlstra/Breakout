@@ -172,6 +172,8 @@ class Paddle(Movable):
 
 		# make sure paddle can not turn more than 30 over track 
 		dist = self.prot - self.trot
+		if dist < 0:
+			dist = 360 + dist
 		if 45 < dist < 180:
 			self.prot = self.trot + 30
 		if 180 < dist < 315:
@@ -224,9 +226,9 @@ class Paddle(Movable):
 
 		# move sprite up or down as needed
 		if ly > ry:
-			self.py = self.y = ly + 240 - 14
+			self.py = self.y = ly + 240 - 14 + 2
 		else:
-			self.py = self.y = ry + 240 - 14
+			self.py = self.y = ry + 240 - 14 + 2
 
 		# apply gravity, keeping in mind rotation
 		if not lground and not rground:
@@ -425,8 +427,10 @@ def main():
 			if ball.top > 240 and pxarray[ball.x + ball.w / 2][ball.top - 240] >> 24 != 0:
 				state = 'new'
 				# splash ball onto ground
-				for x in range(ball.left, ball.right + 1):
-					pxarray[x][ball.top - 240] = (255, 255, 255, 1)
+				for y in range(0, 10):
+					for x in range(ball.left -2, ball.right + 3):
+						if x < 640:
+							pxarray[x][ball.top - 240 - y] = (200, 200, 200, 250)
 
 
 		else: # state is new

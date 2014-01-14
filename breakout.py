@@ -1,5 +1,6 @@
 import pygame, os, sys, random, math
 import pygame.gfxdraw
+import traceback
 
 def getDeg(dx, dy):
 	'Helper function that returns degree based on slope'
@@ -40,6 +41,15 @@ class Movable(pygame.Rect):
 		self.dx = self.dx + new_dx
 		self.dy = self.dy + new_dy
 		self.fixVelDir()
+
+	# takes a float percentage (from zero to one)
+	# where one is full stop
+	def slow(self, percent):
+		if percent > 1:
+			percent = 1
+
+		self.vel -= self.vel * percent 
+		self.fixDxDy()
 
 	def stop(self):
 		self.vel = 0
@@ -87,13 +97,11 @@ class Ball(Movable):
 
 	def flipDx(self):
 		"Flips the ball's horizontal speed from pos to neg or visa versa"
-		#self.applyFddorce(self.dx*2, 180)#always 180 because dx can be min!
 		self.dx = -self.dx
 		self.fixVelDir()
 
 	def flipDy(self):
 		"Flips the ball's vertical speed from pos to neg or visa versa"
-		#self.applyForce(self.dy*2, 270) # always 270 because dy can be min!
 		self.dy = -self.dy
 		self.fixVelDir()
 
@@ -139,7 +147,7 @@ class Paddle(Movable):
 		Movable.__init__(self, x, y, 32, 8)
 
 		# acceleration
-		self.accel = .60
+		self.accel = 2.60
 
 		# Track rotation
 		self.trot = 0.0
@@ -147,20 +155,16 @@ class Paddle(Movable):
 		# Paddle rotation
 		self.prot = 0.0
 
-		# paddle state
-		self.flying = False
-		self.brk = False
-
 
 	def moveLeft(self):
 		'Moves paddle left'
-		if not self.flying:
-			self.applyForce(self.accel, 180 + self.trot)
+		#if not self.flying:
+		self.applyForce(self.accel, 180 + self.trot)
 
 	def moveRight(self):
 		'Moves paddle right'
-		if not self.flying:
-			self.applyForce(self.accel, self.trot)
+		#if not self.flying:
+		self.applyForce(self.accel, self.trot)
 
 	def update(self, pxarray):
 		# update paddle rotation based on mouse angle
@@ -172,10 +176,15 @@ class Paddle(Movable):
 
 		# make sure paddle can not turn more than 30 over track 
 		dist = self.prot - self.trot
+		if dist < 0:
+			dist = 360 + dist
+
 		if 45 < dist < 180:
 			self.prot = self.trot + 30
+	
 		if 180 < dist < 315:
 			self.prot = self.trot - 30
+
 
 		# update track rotation based on ground
 		# we want to look 14 pixels 'below' (rotated) top of paddle
@@ -201,7 +210,7 @@ class Paddle(Movable):
 
 		# rotate tracks 
 		if lground or rground:
-			self.flying = False
+			#self.flying = False
 			# find where ground below left is
 			if not lground:
 				ch = 1 # change
@@ -219,43 +228,28 @@ class Paddle(Movable):
 			# do the actual rotation
 			deg = getDeg(rx - lx, ry - ly)
 			self.trot = deg
-		else:
-			self.flying = True
 
-		# move sprite up or down as needed
+		# move sprite up or down as needed 
+		# EVIL CODE, why do I need the +2 at the end???
 		if ly > ry:
-			self.py = self.y = ly + 240 - 14
+			self.py = self.y = ly + 240 - 14 + 2
 		else:
-			self.py = self.y = ry + 240 - 14
+			self.py = self.y = ry + 240 - 14 + 2
 
-		# apply gravity, keeping in mind rotation
-		if not lground and not rground:
-			self.applyForce(1.0, 90)
-		else:
-			deg = self.trot
-			if deg < 0:
-				deg += 180
-			elif deg > 180:
-				deg -= 180
-			force = (90 - abs(deg - 90)) / 90 
-			self.applyForce(force, deg)
-
-		#slow down due to friction or breaking
-		if self.flying:
-			self.applyForce(self.vel * 0.05, self.direction - 180)
-		elif self.brk:
-			if self.vel < 0.5:
-				self.stop()
-			else:
-				self.applyForce(self.vel * 0.25, self.direction - 180)
-		else:
-			if self.vel < 0.1:
-				self.stop()
-			else:
-				self.applyForce(self.vel * 0.1, self.direction - 180)
+		if 0 < self.direction < 90:
+			self.vel += self.vel * self.direction / 90
+		if 360 > self.direction > 270:
+			self.vel -= self.vel * (360 - self.direction) / 90
+		if 90 < self.direction < 180:
+			self.vel += self.vel * (180 - self.direction) / 90
+		if 180 < self.direction < 270:
+			self.vel -= self.vel * (self.direction - 180) / 90
+		self.fixDxDy()
 
 		# do the actual move
 		Movable.update(self)
+		# no accelerated motion for paddle
+		self.stop() 
 
 		# make sure we don't fall off the screen
 		if self.x > 640 - self.w:
@@ -363,13 +357,6 @@ def main():
 			   or (event.type == pygame.JOYBUTTONDOWN and event.button == 5):
 				pygame.quit()
 				sys.exit()
-
-			if (event.type == pygame.KEYDOWN and event.key == pygame.K_LCTRL) or \
-					(event.type == pygame.JOYBUTTONDOWN and event.button == 12):
-				paddle.brk = True
-			if (event.type == pygame.KEYUP and event.key == pygame.K_LCTRL) or \
-					(event.type == pygame.JOYBUTTONUP and event.button == 12):
-				paddle.brk = False
 
 
 		keys = pygame.key.get_pressed()

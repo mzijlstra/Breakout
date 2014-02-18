@@ -145,20 +145,22 @@ class Dirt(Brick):
 		self.applyForce(0.2, 90);
 
 		# wrap around the left and right
-		if self.x < 0: 
+		if self.x < -31: 
 			self.x = 639
 		if self.x >= 640:
-			self.x = 0
+			self.x = -31
 
 		if pxarray[self.x][self.y] >> 24 != 0:
 			# randomly add 1, 2, or 3 px of sand
 			for x in range(0,32):
-				drops = random.randrange(1,4)
+				xpos = abs((self.x + x) % 640)
+				#drops = random.randrange(1,4)
+				drops = 2
 				for d in range (0, drops):
 					y = self.y + 16
-					while pxarray[self.x + x][y] >> 24 != 0:
+					while pxarray[xpos][y] >> 24 != 0:
 						y -= 1
-					pxarray[self.x + x][y] = (210,210,210,250)
+					pxarray[xpos][y] = (190,150,80,250)
 			return False
 		else:
 			return True

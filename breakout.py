@@ -124,6 +124,44 @@ class Brick(Movable):
 		if self.x < -32:
 			self.px = 640.0
 
+class Dirt(Brick):
+	img = pygame.image.load('gfx/dirt.png')
+
+	def __init__(self, brick):
+		'constructor, rect stuff plus dx'
+		Brick.__init__(self, brick.x, brick.y, brick.w, brick.h)
+		self.px = brick.px
+		self.py = brick.py
+		self.vel = brick.vel
+		self.direction = brick.direction
+		self.fixDxDy()
+
+	def display(self, surface):
+		'Blits dirt image to the given surface'
+		surface.blit(Dirt.img, self)
+
+	def update(self, pxarray):
+		Brick.update(self)
+		self.applyForce(0.2, 90);
+
+		# wrap around the left and right
+		if self.x < 0: 
+			self.x = 639
+		if self.x >= 640:
+			self.x = 0
+
+		if pxarray[self.x][self.y] >> 24 != 0:
+			# randomly add 1, 2, or 3 px of sand
+			for x in range(0,32):
+				drops = random.randrange(1,4)
+				for d in range (0, drops):
+					y = self.y + 16
+					while pxarray[self.x + x][y] >> 24 != 0:
+						y -= 1
+					pxarray[self.x + x][y] = (210,210,210,250)
+			return False
+		else:
+			return True
 
 
 class Paddle(Movable):
@@ -187,16 +225,16 @@ class Paddle(Movable):
 
 		# find top of terrain for left side of track 
 		lground = False
-		lx, ly = x + self.x + 2, y + self.y - 240
-		if (0 < lx < 640 and 0 < ly < 240):
+		lx, ly = x + self.x + 2, y + self.y
+		if (0 < lx < 640 and 0 < ly < 480):
 			while pxarray[lx][ly] >> 24 != 0:
 				lground = True
 				ly -= 1
 
 		# find top of terrain for right side of track
 		rground = False
-		rx, ry = x + self.x + self.w - 2, y + self.y - 240
-		if (0 < rx < 640 and 0 < ry < 240):
+		rx, ry = x + self.x + self.w - 2, y + self.y
+		if (0 < rx < 640 and 0 < ry < 480):
 			while pxarray[rx][ry] >> 24 != 0:
 				rground = True
 				ry -= 1
@@ -226,9 +264,9 @@ class Paddle(Movable):
 
 		# move sprite up or down as needed
 		if ly > ry:
-			self.py = self.y = ly + 240 - 14 + 2
+			self.py = self.y = ly - 14 + 2
 		else:
-			self.py = self.y = ry + 240 - 14 + 2
+			self.py = self.y = ry - 14 + 2
 
 		# apply gravity, keeping in mind rotation
 		if not lground and not rground:
@@ -312,14 +350,14 @@ def main():
 	back = pygame.image.load('gfx/background.png').convert()
 
 	# create terrain with random slopes
-	terrain = pygame.Surface((640, 240), pygame.SRCALPHA, 32)
+	terrain = pygame.Surface((640, 480), pygame.SRCALPHA, 32)
 	terrain = terrain.convert_alpha()
 	terrain.fill((0,0,0,0))
 
 	# points along x axis with random y
 	p = []
 	for i in range(0, 5):
-		p.append(random.randrange(140,240))
+		p.append(random.randrange(380,480))
 
 	# draw increasingly lighter colored bezier going down
 	for i in range(0,100):
@@ -330,6 +368,7 @@ def main():
 	paddle = Paddle(width / 2 - 16, height - 20)
 	ball = Ball()
 	bricks = []
+	dirts = []
 	brickrect = Brick.img.get_rect()
 
 	#optimize images
@@ -417,20 +456,28 @@ def main():
 					bricks[block].collidepoint(ball.x + ball.w, bally)):
 					# apply force when hitting brick left/right 
 					ball.applyForce(bricks[block].vel, -bricks[block].direction)
-					bricks.pop(block)
+					dirts.append(Dirt(bricks.pop(block)))
 				elif bricks[block].collidepoint(ballx, ball.y) or \
 						bricks[block].collidepoint(ballx, ball.y + ball.h):
 					ball.flipDy()
-					bricks.pop(block)
+					dirts.append(Dirt(bricks.pop(block)))
 
 			# check if ball hits ground, change to new ball
-			if ball.top > 240 and pxarray[ball.x + ball.w / 2][ball.top - 240] >> 24 != 0:
+			# TODO move this into the ball class???
+			if pxarray[ball.x + ball.w / 2][ball.top] >> 24 != 0:
 				state = 'new'
 				# splash ball onto ground
-				for y in range(0, 10):
-					for x in range(ball.left -2, ball.right + 3):
-						if x < 640:
-							pxarray[x][ball.top - 240 - y] = (200, 200, 200, 250)
+				for y in range(0, 5):
+					y2 = int(y/2)
+					for x in range(ball.left -2 + y2, ball.right + 3 -y2):
+						if 0 < x < 640:
+							wh = 210 + y *5;
+							pxarray[x][ball.top - y] = (wh,wh,wh,250)
+
+			# move dirts
+			for dirt in dirts:
+				if not dirt.update(pxarray):
+					dirts.remove(dirt)
 
 
 		else: # state is new
@@ -457,11 +504,13 @@ def main():
 
 		#draw screen
 		screen.blit(back, screen.get_rect())
-		screen.blit(terrain, (0, 240));
+		screen.blit(terrain, (0, 0));
 		ball.display(screen)
 		paddle.display(screen)
 		for b in bricks:
 			b.display(screen)
+		for d in dirts:
+			d.display(screen)
 		pygame.display.flip()
 
 		#do all this at 60 fps

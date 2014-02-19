@@ -70,7 +70,7 @@ class Ball(Movable):
 		rect = Ball.img.get_rect()
 		Movable.__init__(self, x, y, rect.w, rect.h)
 
-	def update(self):
+	def update(self, pxarray):
 		Movable.update(self)
 
 		if self.x < 0 or self.x > 640 - self.w: 
@@ -80,6 +80,23 @@ class Ball(Movable):
 		if self.y < 0:
 			self.flipDy()
 			Movable.update(self)
+
+		# check if ball hits ground
+		if pxarray[self.x + self.w / 2][self.top] >> 24 != 0:
+			# splash ball onto ground
+			for y in range(0, 5):
+				y2 = int(y/2)
+				for x in range(self.left -2 + y2, self.right + 3 - y2):
+					if 0 < x < 640:
+						ypos = self.y + 8
+						while pxarray[x][ypos] >> 24 != 0:
+							ypos -= 1
+						wh = 210 + y *5;
+						pxarray[x][ypos] = (wh,wh,wh,250)
+			return False
+		else:
+			return True
+
 
 	def display(self, surface):
 		'Blits ball image to the give surface'
@@ -151,10 +168,9 @@ class Dirt(Brick):
 			self.x = -31
 
 		if pxarray[self.x][self.y] >> 24 != 0:
-			# randomly add 1, 2, or 3 px of sand
+			# add drops px of sand
 			for x in range(0,32):
 				xpos = abs((self.x + x) % 640)
-				#drops = random.randrange(1,4)
 				drops = 2
 				for d in range (0, drops):
 					y = self.y + 16
@@ -434,7 +450,9 @@ def main():
 
 		if state == 'playing':
 			# move ball based on it's own dx/dy
-			ball.update()
+			# if ball hits ground change to new state
+			if not ball.update(pxarray):
+				state = 'new'
 
 			# if we hit the paddle
 			if ball.colliderect(paddle):
@@ -445,7 +463,7 @@ def main():
 				ball.fixDxDy()
 
 				# make sure we exit the paddle right away
-				ball.update()
+				ball.update(pxarray)
 
 			# check block collisions
 			blocks = ball.collidelistall(bricks)
@@ -464,18 +482,6 @@ def main():
 					ball.flipDy()
 					dirts.append(Dirt(bricks.pop(block)))
 
-			# check if ball hits ground, change to new ball
-			# TODO move this into the ball class???
-			if pxarray[ball.x + ball.w / 2][ball.top] >> 24 != 0:
-				state = 'new'
-				# splash ball onto ground
-				for y in range(0, 5):
-					y2 = int(y/2)
-					for x in range(ball.left -2 + y2, ball.right + 3 -y2):
-						if 0 < x < 640:
-							wh = 210 + y *5;
-							pxarray[x][ball.top - y] = (wh,wh,wh,250)
-
 			# move dirts
 			for dirt in dirts:
 				if not dirt.update(pxarray):
@@ -492,13 +498,13 @@ def main():
 			ball.py = paddle.py - dy
 			ball.dx = 0
 			ball.dy = 0
-			ball.update()
+			ball.update(pxarray)
 			
 			(b1, b2, b3) = pygame.mouse.get_pressed()
 			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)) or b1:
 				#ball.applyForce(3, random.uniform(-115, -65))
 				ball.applyForce(3, paddle.prot - 90)
-				ball.update()
+				ball.update(pxarray)
 				state = 'playing'
 			
 		# clean up

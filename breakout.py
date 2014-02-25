@@ -191,7 +191,6 @@ class Paddle(Movable):
 		optional x and y parameters set initial position"""
 
 		# run super class constructor first
-		#rect = Paddle.img.get_rect()
 		Movable.__init__(self, x, y, 32, 8)
 
 		# acceleration
@@ -330,6 +329,15 @@ class Paddle(Movable):
 			self.stop()
 			self.y = self.py = 0
 
+		# adjust terrain -- flatten if we moved up hill
+		# TODO consider visual spray
+		if self.dx > 0 and self.dy < 0: #move right and up
+			#pxarray[][]
+			pass
+		elif self.dx < 0 and self.dy < 0: # left and up
+			#pxarray[][]
+			pass
+
 	
 	def display(self, surface):
 		'Blits paddle image to the given surface'
@@ -379,8 +387,10 @@ def main():
 
 	# draw increasingly lighter colored bezier going down
 	for i in range(0,100):
-		points = ((0, p[0] +i), (160, p[1] +i), (320, p[2] +i), (480, p[3] +i), (639, p[4] +i))
-		pygame.gfxdraw.bezier(terrain, points, 100, (int(200 + i*0.5),150 + i, i*2))
+		points = ((0, p[0] +i), (160, p[1] +i), (320, p[2] +i), 
+			(480, p[3] +i), (639, p[4] +i))
+		pygame.gfxdraw.bezier(terrain, points, 100, 
+			(int(200 + i*0.5),150 + i, i*2))
 
 	# game elements
 	paddle = Paddle(width / 2 - 16, height - 20)
@@ -418,13 +428,15 @@ def main():
 		# quit on window close or escape key
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT \
-			   or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE) \
-			   or (event.type == pygame.JOYBUTTONDOWN and event.button == 5):
+			   or (event.type == pygame.KEYDOWN and \
+			   event.key == pygame.K_ESCAPE) \
+			   or (event.type == pygame.JOYBUTTONDOWN and \
+			   event.button == 5):
 				pygame.quit()
 				sys.exit()
 
-			if (event.type == pygame.KEYDOWN and event.key == pygame.K_LCTRL) or \
-					(event.type == pygame.JOYBUTTONDOWN and event.button == 12):
+			if (event.type == pygame.KEYDOWN and event.key == pygame.K_LCTRL) \
+			  or (event.type == pygame.JOYBUTTONDOWN and event.button == 12):
 				paddle.brk = True
 			if (event.type == pygame.KEYUP and event.key == pygame.K_LCTRL) or \
 					(event.type == pygame.JOYBUTTONUP and event.button == 12):
@@ -434,10 +446,12 @@ def main():
 		keys = pygame.key.get_pressed()
 		# move paddle based on left and right arrows
 		if keys[pygame.K_LEFT] or keys[pygame.K_a] or \
-				(joy and (joy.get_button(2) or joy.get_axis(0) < -0.2 or joy.get_axis(2) < -0.2)):
+				(joy and (joy.get_button(2) or joy.get_axis(0) < -0.2 or \
+				joy.get_axis(2) < -0.2)):
 			paddle.moveLeft()
 		if keys[pygame.K_RIGHT] or keys[pygame.K_d] or \
-				(joy and (joy.get_button(3) or joy.get_axis(0) > 0.2 or joy.get_axis(2) > 0.2)):
+				(joy and (joy.get_button(3) or joy.get_axis(0) > 0.2 or \
+				joy.get_axis(2) > 0.2)):
 			paddle.moveRight()
 
 		# move the paddle
@@ -502,7 +516,6 @@ def main():
 			
 			(b1, b2, b3) = pygame.mouse.get_pressed()
 			if keys[pygame.K_SPACE] or (joy and joy.get_button(11)) or b1:
-				#ball.applyForce(3, random.uniform(-115, -65))
 				ball.applyForce(3, paddle.prot - 90)
 				ball.update(pxarray)
 				state = 'playing'
